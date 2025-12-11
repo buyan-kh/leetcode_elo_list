@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LeetCode Rating Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-slate-950 text-slate-50 transition-colors">
+    <div id="root" class="min-h-screen">
+      <div style="padding: 2rem; color: white; text-align: center">
+        <p>Loading...</p>
+        <noscript>
+          <p style="color: #ef4444; margin-top: 1rem">
+            JavaScript is required to run this app.
+          </p>
+        </noscript>
+      </div>
+    </div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo } = React;
+      const { createRoot } = ReactDOM;
+
+      const cn = (...classes) => classes.filter(Boolean).join(" ");
+
+      const THEME_KEY = "lc-tracking-theme";
+
+      const loadTheme = () => {
+        if (typeof localStorage === "undefined") return "dark";
+        return localStorage.getItem(THEME_KEY) || "dark";
+      };
+
+      const saveTheme = (theme) => {
+        if (typeof localStorage === "undefined") return;
+        localStorage.setItem(THEME_KEY, theme);
+      };
+
+      const Button = ({
+        variant = "default",
+        className = "",
+        theme = "dark",
+        component = "button",
+        children,
+        ...props
+      }) => {
+        const variants = {
+          default:
+            theme === "dark"
+              ? "bg-slate-100 text-slate-900 hover:bg-white/80"
+              : "bg-slate-800 text-slate-50 hover:bg-slate-700",
+          outline:
+            theme === "dark"
+              ? "border border-slate-700 text-slate-50 hover:bg-slate-800"
+              : "border border-slate-300 text-slate-900 hover:bg-slate-100",
+          ghost:
+            theme === "dark"
+              ? "text-slate-50 hover:bg-slate-800"
+              : "text-slate-900 hover:bg-slate-100",
+        };
+        const Component = component;
+        return (
+          <Component
+            className={cn(
+              "h-9 px-3 inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer",
+              theme === "dark"
+                ? "focus-visible:outline-slate-300"
+                : "focus-visible:outline-slate-500",
+              variants[variant],
+              className
+            )}
+            {...props}
+          >
+            {children}
+          </Component>
+        );
+      };
+
+      const Input = ({ className = "", theme = "dark", ...props }) => (
+        <input
+          className={cn(
+            "h-10 w-full rounded-md border px-3 text-sm shadow-sm outline-none ring-0 transition-colors",
+            theme === "dark"
+              ? "border-slate-800 bg-slate-900 text-slate-50 placeholder:text-slate-500 focus:border-slate-500"
+              : "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-slate-500",
+            className
+          )}
+          {...props}
+        />
+      );
+
+      const Checkbox = ({
+        className = "",
+        checked,
+        theme = "dark",
+        ...props
+      }) => (
+        <input
+          type="checkbox"
+          className={cn(
+            "h-5 w-5 rounded border-2 cursor-pointer transition-all",
+            checked
+              ? "border-emerald-500 bg-emerald-500 text-white"
+              : theme === "dark"
+              ? "border-slate-600 bg-slate-900 text-slate-100 hover:border-slate-500"
+              : "border-slate-400 bg-white text-slate-900 hover:border-slate-500",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2",
+            theme === "dark"
+              ? "focus-visible:ring-offset-slate-900"
+              : "focus-visible:ring-offset-white",
+            className
+          )}
+          checked={checked}
+          {...props}
+        />
+      );
+
+      const Card = ({ className = "", theme = "dark", children }) => (
+        <div
+          className={cn(
+            "rounded-xl border shadow-sm",
+            theme === "dark"
+              ? "border-slate-800 bg-slate-900/60"
+              : "border-slate-200 bg-white",
+            className
+          )}
+        >
+          {children}
+        </div>
+      );
+
+      const Badge = ({ children, className = "", theme = "dark" }) => (
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium",
+            theme === "dark"
+              ? "border-slate-700 text-slate-100"
+              : "border-slate-300 text-slate-900",
+            className
+          )}
+        >
+          {children}
+        </span>
+      );
+
+      const Progress = ({ value }) => (
+        <div className="h-2 w-full rounded-full bg-slate-800">
+          <div
+            className="h-2 rounded-full bg-emerald-400 transition-all"
+            style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={value}
+          />
+        </div>
+      );
+
+      const STORAGE_KEY = "lc-tracking-solved";
+      const PAGE_KEY = "lc-tracking-page";
+
+      const loadSolved = () => {
+        if (typeof localStorage === "undefined") return new Map();
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return new Map();
+          const parsed = JSON.parse(raw);
+          // Support both old format (array) and new format (object with timestamps)
+          if (Array.isArray(parsed)) {
+            const map = new Map();
+            parsed.forEach((id) =>
+              map.set(Number(id), new Date().toISOString())
+            );
+            return map;
+          }
+          return new Map(
+            Object.entries(parsed).map(([id, timestamp]) => [
+              Number(id),
+              timestamp,
+            ])
+          );
+        } catch {
+          return new Map();
+        }
+      };
+
+      const saveSolved = (solvedMap) => {
+        if (typeof localStorage === "undefined") return;
+        const obj = Object.fromEntries(solvedMap);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+      };
+
+      const loadPage = () => {
+        if (typeof localStorage === "undefined") return 1;
+        try {
+          const raw = localStorage.getItem(PAGE_KEY);
+          if (!raw) return 1;
+          return Number(raw) || 1;
+        } catch {
+          return 1;
+        }
+      };
+
+      const savePage = (page) => {
+        if (typeof localStorage === "undefined") return;
+        localStorage.setItem(PAGE_KEY, String(page));
+      };
+
+      const exportSolvedToFile = (solvedMap) => {
+        try {
+          const idsArray = Array.from(solvedMap.keys());
+          const data = {
+            solvedIds: idsArray,
+            solvedWithTimestamps: Object.fromEntries(solvedMap),
+            exportedAt: new Date().toISOString(),
+            version: "2.0",
+          };
+          const blob = new Blob([JSON.stringify(data, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "leetcode-solved-problems.json";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          return true;
+        } catch (err) {
+          console.error("Failed to export solved problems:", err);
+          return false;
+        }
+      };
+
+      const importSolvedFromFile = (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const data = JSON.parse(e.target.result);
+              // Support both old format (array) and new format (object with timestamps)
+              if (data.solvedWithTimestamps) {
+                resolve(
+                  new Set(Object.keys(data.solvedWithTimestamps).map(Number))
+                );
+              } else {
+                const ids = data.solvedIds || data;
+                if (Array.isArray(ids)) {
+                  resolve(new Set(ids.map((id) => Number(id))));
+                } else {
+                  reject(new Error("Invalid file format"));
+                }
+              }
+            } catch (err) {
+              reject(new Error("Failed to parse file: " + err.message));
+            }
+          };
+          reader.onerror = () => reject(new Error("Failed to read file"));
+          reader.readAsText(file);
+        });
+      };
+
+      const ThemeToggle = ({ theme, onToggle }) => (
+        <button
+          onClick={onToggle}
+          className={cn(
+            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2",
+            theme === "dark" ? "bg-emerald-600" : "bg-slate-300"
+          )}
+          aria-label="Toggle theme"
+        >
+          <span
+            className={cn(
+              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+              theme === "dark" ? "translate-x-6" : "translate-x-1"
+            )}
+          />
+        </button>
+      );
+
+      const Pagination = ({ currentPage, totalPages, onPageChange, theme }) => {
+        if (totalPages <= 1) return null;
+
+        const getPageNumbers = () => {
+          const pages = [];
+          const maxVisible = 5;
+          let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+          let end = Math.min(totalPages, start + maxVisible - 1);
+
+          if (end - start < maxVisible - 1) {
+            start = Math.max(1, end - maxVisible + 1);
+          }
+
+          if (start > 1) {
+            pages.push(1);
+            if (start > 2) pages.push("...");
+          }
+
+          for (let i = start; i <= end; i++) {
+            pages.push(i);
+          }
+
+          if (end < totalPages) {
+            if (end < totalPages - 1) pages.push("...");
+            pages.push(totalPages);
+          }
+
+          return pages;
+        };
+
+        return (
+          <div className="flex items-center justify-center gap-2 py-4">
+            <Button
+              variant="outline"
+              theme={theme}
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center gap-1">
+              {getPageNumbers().map((page, idx) => {
+                if (page === "...") {
+                  return (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className={cn(
+                        "px-2",
+                        theme === "dark" ? "text-slate-400" : "text-slate-600"
+                      )}
+                    >
+                      ...
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={page}
+                    onClick={() => onPageChange(page)}
+                    className={cn(
+                      "h-9 w-9 rounded-md text-sm font-medium transition-colors",
+                      page === currentPage
+                        ? theme === "dark"
+                          ? "bg-emerald-600 text-white"
+                          : "bg-emerald-500 text-white"
+                        : theme === "dark"
+                        ? "border border-slate-700 text-slate-50 hover:bg-slate-800"
+                        : "border border-slate-300 text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              theme={theme}
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        );
+      };
+
+      const App = () => {
+        const [problems, setProblems] = useState([]);
+        const [bounds, setBounds] = useState({ min: null, max: null });
+        const [minRating, setMinRating] = useState("");
+        const [maxRating, setMaxRating] = useState("");
+        const [sortDir, setSortDir] = useState("asc");
+        const [solvedIds, setSolvedIds] = useState(new Map());
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState("");
+        const [theme, setTheme] = useState(loadTheme);
+        const [currentPage, setCurrentPage] = useState(loadPage());
+        const [itemsPerPage, setItemsPerPage] = useState(20);
+        const [importMessage, setImportMessage] = useState("");
+        const filtersInitializedRef = React.useRef(false);
+
+        useEffect(() => {
+          setSolvedIds(loadSolved());
+        }, []);
+
+        useEffect(() => {
+          saveSolved(solvedIds);
+        }, [solvedIds]);
+
+        useEffect(() => {
+          savePage(currentPage);
+        }, [currentPage]);
+
+        useEffect(() => {
+          saveTheme(theme);
+          document.documentElement.classList.toggle("dark", theme === "dark");
+          document.body.className =
+            theme === "dark"
+              ? "bg-slate-950 text-slate-50"
+              : "bg-slate-50 text-slate-900";
+        }, [theme]);
+
+        const toggleTheme = () => {
+          setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+        };
+
+        useEffect(() => {
+          const loadData = async () => {
+            try {
+              setLoading(true);
+              const res = await fetch("data (1).json");
+              if (!res.ok) throw new Error("Unable to load data file");
+              const data = await res.json();
+              setProblems(data);
+              const ratings = data.map((p) => p.Rating);
+              const min = Math.floor(Math.min(...ratings));
+              const max = Math.ceil(Math.max(...ratings));
+              setBounds({ min, max });
+              setMinRating(min);
+              setMaxRating(max);
+              setError("");
+              filtersInitializedRef.current = true;
+            } catch (err) {
+              console.error(err);
+              setError(
+                `Failed to load problem data: ${err.message}. Make sure you're running this from a web server (not file://). Try: python3 -m http.server 8000`
+              );
+            } finally {
+              setLoading(false);
+            }
+          };
+          loadData();
+        }, []);
+
+        const parsedMin = useMemo(() => {
+          const num = Number(minRating);
+          return Number.isFinite(num) ? num : bounds.min;
+        }, [minRating, bounds.min]);
+
+        const parsedMax = useMemo(() => {
+          const num = Number(maxRating);
+          return Number.isFinite(num) ? num : bounds.max;
+        }, [maxRating, bounds.max]);
+
+        const filtered = useMemo(() => {
+          if (!problems.length) return [];
+          const min = parsedMin ?? -Infinity;
+          const max = parsedMax ?? Infinity;
+          return problems
+            .filter((p) => p.Rating >= min && p.Rating <= max)
+            .slice()
+            .sort((a, b) =>
+              sortDir === "desc" ? b.Rating - a.Rating : a.Rating - b.Rating
+            );
+        }, [problems, parsedMin, parsedMax, sortDir]);
+
+        // Reset to page 1 when filters change (but not on initial load)
+        const prevFiltersRef = React.useRef({ minRating, maxRating, sortDir });
+        useEffect(() => {
+          if (filtersInitializedRef.current) {
+            const prevFilters = prevFiltersRef.current;
+            const filtersChanged =
+              prevFilters.minRating !== minRating ||
+              prevFilters.maxRating !== maxRating ||
+              prevFilters.sortDir !== sortDir;
+
+            if (filtersChanged) {
+              setCurrentPage(1);
+              prevFiltersRef.current = { minRating, maxRating, sortDir };
+            }
+          } else {
+            // Store initial filter values
+            prevFiltersRef.current = { minRating, maxRating, sortDir };
+          }
+        }, [minRating, maxRating, sortDir]);
+
+        // Calculate pagination
+        const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+        // Ensure currentPage is valid (not beyond totalPages)
+        useEffect(() => {
+          if (totalPages > 0 && currentPage > totalPages) {
+            setCurrentPage(1);
+          }
+        }, [totalPages, currentPage]);
+
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedProblems = filtered.slice(startIndex, endIndex);
+
+        const total = problems.length;
+        const solvedCount = useMemo(() => {
+          if (!total) return 0;
+          return problems.reduce(
+            (count, p) => (solvedIds.has(p.ID) ? count + 1 : count),
+            0
+          );
+        }, [problems, solvedIds]);
+
+        const progress = total ? Math.round((solvedCount / total) * 100) : 0;
+
+        // Calculate ELO (highest rating of solved problems)
+        const minELO = 1084;
+        const maxELO = 3125;
+        const eloRange = maxELO - minELO;
+
+        const userELO = useMemo(() => {
+          if (!problems.length || solvedIds.size === 0) return 0;
+          let maxRating = 0;
+          problems.forEach((p) => {
+            if (solvedIds.has(p.ID) && p.Rating > maxRating) {
+              maxRating = p.Rating;
+            }
+          });
+          return Math.round(maxRating);
+        }, [problems, solvedIds]);
+
+        const eloPercentage =
+          userELO > 0 ? Math.round(((userELO - minELO) / eloRange) * 100) : 0;
+
+        const toggleSolved = (id) => {
+          setSolvedIds((prev) => {
+            const next = new Map(prev);
+            if (next.has(id)) {
+              next.delete(id);
+            } else {
+              next.set(id, new Date().toISOString());
+            }
+            return next;
+          });
+        };
+
+        const resetFilters = () => {
+          if (bounds.min !== null) setMinRating(bounds.min);
+          if (bounds.max !== null) setMaxRating(bounds.max);
+        };
+
+        const handleExport = () => {
+          const success = exportSolvedToFile(Array.from(solvedIds));
+          if (success) {
+            setImportMessage("Exported successfully!");
+            setTimeout(() => setImportMessage(""), 3000);
+          } else {
+            setImportMessage("Export failed. Check console for details.");
+            setTimeout(() => setImportMessage(""), 5000);
+          }
+        };
+
+        const handleImport = async (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          try {
+            const importedIds = await importSolvedFromFile(file);
+            // Merge with existing solved IDs
+            setSolvedIds((prev) => {
+              const merged = new Map(prev);
+              const now = new Date().toISOString();
+              importedIds.forEach((id) => {
+                if (!merged.has(id)) {
+                  merged.set(id, now);
+                }
+              });
+              const totalCount = merged.size;
+              setImportMessage(
+                `Imported ${importedIds.size} solved problems. Total: ${totalCount}`
+              );
+              return merged;
+            });
+            setTimeout(() => setImportMessage(""), 5000);
+          } catch (err) {
+            setImportMessage(`Import failed: ${err.message}`);
+            setTimeout(() => setImportMessage(""), 5000);
+          }
+          // Reset file input
+          event.target.value = "";
+        };
+
+        return (
+          <div
+            className={cn(
+              "min-h-screen transition-colors",
+              theme === "dark" ? "bg-slate-950" : "bg-slate-50"
+            )}
+          >
+            <header
+              className={cn(
+                "border-b backdrop-blur",
+                theme === "dark"
+                  ? "border-slate-800 bg-slate-900/70"
+                  : "border-slate-200 bg-white/70"
+              )}
+            >
+              <div className="mx-auto max-w-6xl px-4 py-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h1
+                      className={cn(
+                        "text-xl font-semibold leading-tight",
+                        theme === "dark" ? "text-slate-50" : "text-slate-900"
+                      )}
+                    >
+                      LeetCode Rating Tracker
+                    </h1>
+                    <p
+                      className={cn(
+                        "text-sm",
+                        theme === "dark" ? "text-slate-400" : "text-slate-600"
+                      )}
+                    >
+                      Filter by rating, sort, and mark problems solved.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" ? "text-slate-400" : "text-slate-600"
+                        )}
+                      >
+                        {theme === "dark" ? "🌙" : "☀️"}
+                      </span>
+                      <ThemeToggle theme={theme} onToggle={toggleTheme} />
+                    </div>
+                    <div className="flex flex-col items-start sm:items-end gap-2 min-w-[280px]">
+                      <div className="flex flex-col items-start sm:items-end gap-1">
+                        <div className="flex items-center gap-3 whitespace-nowrap">
+                          <div
+                            className={cn(
+                              "text-sm font-medium",
+                              theme === "dark"
+                                ? "text-slate-200"
+                                : "text-slate-900"
+                            )}
+                          >
+                            {solvedCount} / {total || 0} solved
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={cn(
+                                "text-sm font-medium",
+                                theme === "dark"
+                                  ? "text-slate-200"
+                                  : "text-slate-900"
+                              )}
+                            >
+                              ELO: {userELO || 0}
+                            </div>
+                            <div
+                              className={cn(
+                                "text-xs",
+                                theme === "dark"
+                                  ? "text-slate-400"
+                                  : "text-slate-600"
+                              )}
+                            >
+                              ({userELO > 0 ? eloPercentage : 0}%)
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-full max-w-xs">
+                        <Progress value={progress} />
+                        <div
+                          className={cn(
+                            "text-xs mt-1 text-right",
+                            theme === "dark"
+                              ? "text-slate-400"
+                              : "text-slate-600"
+                          )}
+                        >
+                          {progress}% complete
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+              {importMessage && (
+                <Card
+                  className={cn(
+                    "p-3",
+                    importMessage.includes("failed") ||
+                      importMessage.includes("Failed")
+                      ? theme === "dark"
+                        ? "border-red-400/40 bg-red-400/10 text-red-50"
+                        : "border-red-500/40 bg-red-50 text-red-900"
+                      : theme === "dark"
+                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-50"
+                      : "border-emerald-500/40 bg-emerald-50 text-emerald-900"
+                  )}
+                  theme={theme}
+                >
+                  <div className="text-sm">{importMessage}</div>
+                </Card>
+              )}
+
+              <Card className="p-4" theme={theme}>
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label
+                      className={cn(
+                        "text-sm",
+                        theme === "dark" ? "text-slate-300" : "text-slate-700"
+                      )}
+                      htmlFor="minRating"
+                    >
+                      Min rating
+                    </label>
+                    <Input
+                      id="minRating"
+                      type="number"
+                      value={minRating}
+                      min={bounds.min ?? undefined}
+                      max={bounds.max ?? undefined}
+                      onChange={(e) => setMinRating(e.target.value)}
+                      placeholder={
+                        bounds.min ? `Min: ${bounds.min}` : "Min rating"
+                      }
+                      className="w-32"
+                      theme={theme}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      className={cn(
+                        "text-sm",
+                        theme === "dark" ? "text-slate-300" : "text-slate-700"
+                      )}
+                      htmlFor="maxRating"
+                    >
+                      Max rating
+                    </label>
+                    <Input
+                      id="maxRating"
+                      type="number"
+                      value={maxRating}
+                      min={bounds.min ?? undefined}
+                      max={bounds.max ?? undefined}
+                      onChange={(e) => setMaxRating(e.target.value)}
+                      placeholder={
+                        bounds.max ? `Max: ${bounds.max}` : "Max rating"
+                      }
+                      className="w-32"
+                      theme={theme}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      className={cn(
+                        "text-sm",
+                        theme === "dark" ? "text-slate-300" : "text-slate-700"
+                      )}
+                    >
+                      Sort
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        theme={theme}
+                        onClick={() =>
+                          setSortDir((d) => (d === "desc" ? "asc" : "desc"))
+                        }
+                      >
+                        {sortDir === "desc"
+                          ? "Rating: High → Low"
+                          : "Rating: Low → High"}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      className={cn(
+                        "text-sm",
+                        theme === "dark" ? "text-slate-300" : "text-slate-700"
+                      )}
+                    >
+                      Data
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        theme={theme}
+                        onClick={handleExport}
+                      >
+                        Export Solved
+                      </Button>
+                      <label>
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleImport}
+                          className="hidden"
+                        />
+                        <Button
+                          variant="outline"
+                          theme={theme}
+                          component="span"
+                        >
+                          Import Solved
+                        </Button>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <label
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" ? "text-slate-400" : "text-slate-600"
+                        )}
+                        htmlFor="itemsPerPage"
+                      >
+                        Per page:
+                      </label>
+                      <select
+                        id="itemsPerPage"
+                        value={itemsPerPage}
+                        onChange={(e) => {
+                          setItemsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className={cn(
+                          "h-8 rounded-md border px-2 text-xs",
+                          theme === "dark"
+                            ? "border-slate-700 bg-slate-900 text-slate-50"
+                            : "border-slate-300 bg-white text-slate-900"
+                        )}
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
+                    <div
+                      className={cn(
+                        "text-sm",
+                        theme === "dark" ? "text-slate-400" : "text-slate-600"
+                      )}
+                    >
+                      {filtered.length} of {total || 0} filtered
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {error && (
+                <Card
+                  className={cn(
+                    "p-4",
+                    theme === "dark"
+                      ? "border-amber-400/40 bg-amber-400/10 text-amber-50"
+                      : "border-amber-500/40 bg-amber-50 text-amber-900"
+                  )}
+                  theme={theme}
+                >
+                  {error}
+                </Card>
+              )}
+
+              <Card theme={theme}>
+                {loading ? (
+                  <div
+                    className={cn(
+                      "p-6 text-center",
+                      theme === "dark" ? "text-slate-400" : "text-slate-600"
+                    )}
+                  >
+                    Loading problems…
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div
+                    className={cn(
+                      "p-6 text-center",
+                      theme === "dark" ? "text-slate-400" : "text-slate-600"
+                    )}
+                  >
+                    No problems in this rating interval.
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className={cn(
+                        "divide-y",
+                        theme === "dark"
+                          ? "divide-slate-800"
+                          : "divide-slate-200"
+                      )}
+                    >
+                      {paginatedProblems.map((problem, index) => {
+                        const isSolved = solvedIds.has(problem.ID);
+                        const displayNumber =
+                          (currentPage - 1) * itemsPerPage + index + 1;
+                        return (
+                          <div
+                            key={problem.ID}
+                            className={cn(
+                              "flex items-start gap-3 px-4 py-3 transition-colors",
+                              isSolved
+                                ? theme === "dark"
+                                  ? "bg-emerald-950/20 hover:bg-emerald-950/30"
+                                  : "bg-emerald-50/50 hover:bg-emerald-50"
+                                : theme === "dark"
+                                ? "hover:bg-slate-900/80"
+                                : "hover:bg-slate-50"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 pt-1">
+                              <span
+                                className={cn(
+                                  "text-sm font-medium min-w-[2rem] text-right",
+                                  theme === "dark"
+                                    ? "text-slate-400"
+                                    : "text-slate-600"
+                                )}
+                              >
+                                {displayNumber}.
+                              </span>
+                              <Checkbox
+                                checked={isSolved}
+                                onChange={() => toggleSolved(problem.ID)}
+                                aria-label={`Mark ${problem.Title} as solved`}
+                                theme={theme}
+                              />
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1 flex-1">
+                                  {problem.TitleSlug ? (
+                                    <a
+                                      href={`https://leetcode.com/problems/${problem.TitleSlug}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={cn(
+                                        "text-lg leading-tight flex items-center gap-2 hover:underline",
+                                        isSolved
+                                          ? "text-emerald-600 line-through"
+                                          : theme === "dark"
+                                          ? "text-slate-50 hover:text-slate-200"
+                                          : "text-slate-900 hover:text-slate-700"
+                                      )}
+                                    >
+                                      {problem.Title}
+                                      {isSolved && (
+                                        <span className="text-xs text-emerald-500">
+                                          ✓ Solved
+                                        </span>
+                                      )}
+                                    </a>
+                                  ) : (
+                                    <div
+                                      className={cn(
+                                        "text-lg leading-tight flex items-center gap-2",
+                                        isSolved
+                                          ? "text-emerald-600 line-through"
+                                          : theme === "dark"
+                                          ? "text-slate-50"
+                                          : "text-slate-900"
+                                      )}
+                                    >
+                                      {problem.Title}
+                                      {isSolved && (
+                                        <span className="text-xs text-emerald-500">
+                                          ✓ Solved
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                <Badge
+                                  theme={theme}
+                                  className={cn(
+                                    isSolved &&
+                                      (theme === "dark"
+                                        ? "border-emerald-600 bg-emerald-950/40 text-emerald-200"
+                                        : "border-emerald-500 bg-emerald-100 text-emerald-700")
+                                  )}
+                                >
+                                  Rating {Math.round(problem.Rating)}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      theme={theme}
+                    />
+                    <div
+                      className={cn(
+                        "px-4 pb-4 text-center text-sm",
+                        theme === "dark" ? "text-slate-400" : "text-slate-600"
+                      )}
+                    >
+                      Showing {startIndex + 1} to{" "}
+                      {Math.min(endIndex, filtered.length)} of {filtered.length}{" "}
+                      problems
+                    </div>
+                  </>
+                )}
+              </Card>
+            </main>
+          </div>
+        );
+      };
+
+      const rootEl = document.getElementById("root");
+      if (rootEl) {
+        createRoot(rootEl).render(<App />);
+      }
+    </script>
+  </body>
+</html>
