@@ -3,6 +3,8 @@
 519 LeetCode problems list in ascending ELO format served with a tiny Python HTTP server.
 Built to feel like you’re leveling up as you solve LeetCode problems.
 
+seamlessly get better at leetcode.
+
 ## Prerequisites
 
 - Python 3.8+ installed
