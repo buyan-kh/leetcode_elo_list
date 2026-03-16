@@ -1,28 +1,108 @@
-## LeetCode Tracker (local)
+# LeetCode Rating Tracker
 
-519 LeetCode problems list in ascending ELO format served with a tiny Python HTTP server.
-Built to feel like you’re leveling up as you solve LeetCode problems.
+A Next.js application for tracking LeetCode problem progress with user authentication and cloud storage.
 
-seamlessly get better at leetcode.
+## Features
+
+- 🔐 User authentication with Supabase (login/signup)
+- 📊 Track solved problems per user
+- 🎯 Filter by rating range
+- 📈 Progress tracking with ELO calculation
+- 🌓 Dark/Light theme toggle
+- 📱 Responsive design
 
 ## Prerequisites
 
-- Python 3.8+ installed
+- Node.js 18+ installed
+- A Supabase account and project
 
-## Installation
+## Setup
 
-1. Download or clone this folder to your machine. Keep `index.html`, `data (1).json`, and `server.py` in the same directory.
-2. Optional: create and activate a virtual environment if you prefer, though only the Python standard library is used.
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-## Run locally
+2. **Set up Supabase:**
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Go to SQL Editor and run the schema from `supabase/schema.sql`
+   - Copy your project URL and anon key from Settings > API
 
-1. Open a terminal in the project folder.
-2. Start the server:
-   - `python3 server.py`
-3. Your browser should open `http://localhost:8001`. If it does not, open that URL manually.
-4. Stop with `Ctrl+C`.
+3. **Configure environment variables:**
+   ```bash
+   cp .env.example .env.local
+   ```
+   
+   Edit `.env.local` and add your Supabase credentials:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-## Troubleshooting
+4. **Add your LeetCode problems data:**
+   - Place your `data.json` file in the `public/` directory
+   - The file should be an array of problems with this structure:
+     ```json
+     [
+       {
+         "ID": 1,
+         "Title": "Two Sum",
+         "TitleSlug": "two-sum",
+         "Rating": 1200
+       }
+     ]
+     ```
 
-- Port already in use: pick a different `PORT` in `server.py`.
-- Nothing loads: ensure you ran the command from the project folder so the server can find `index.html` and `data (1).json`.
+5. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Deployment
+
+### Deploy to Vercel
+
+1. Push your code to GitHub
+2. Import your repository in [Vercel](https://vercel.com)
+3. Add your environment variables in Vercel project settings
+4. Deploy!
+
+The app will be automatically deployed on every push to your main branch.
+
+## Database Schema
+
+The app uses a `user_progress` table in Supabase to store solved problems:
+
+- `id`: UUID primary key
+- `user_id`: References auth.users
+- `problem_id`: Integer (LeetCode problem ID)
+- `solved_at`: Timestamp
+- Row Level Security enabled (users can only see/modify their own progress)
+
+## Project Structure
+
+```
+├── app/
+│   ├── auth/
+│   │   ├── login/        # Login page
+│   │   └── signup/       # Signup page
+│   ├── globals.css       # Global styles
+│   ├── layout.tsx        # Root layout
+│   └── page.tsx          # Main tracker page
+├── components/           # React components
+├── lib/
+│   ├── supabase.ts      # Supabase client
+│   └── utils.ts         # Utility functions
+├── public/
+│   └── data.json        # LeetCode problems data
+├── supabase/
+│   └── schema.sql       # Database schema
+└── types/
+    └── index.ts         # TypeScript types
+```
+
+## License
+
+MIT
