@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { localDb } from '@/lib/localDb'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
@@ -21,13 +21,7 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
+      localDb.signIn(email, password)
       router.push('/')
       router.refresh()
     } catch (err: any) {
@@ -91,7 +85,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-400">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/auth/signup" className="text-emerald-400 hover:underline">
             Sign up
           </Link>

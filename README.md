@@ -1,11 +1,11 @@
 # LeetCode Rating Tracker
 
-A Next.js application for tracking LeetCode problem progress with user authentication and cloud storage.
+A Next.js application for tracking LeetCode problem progress with browser local storage.
 
 ## Features
 
-- 🔐 User authentication with Supabase (login/signup)
-- 📊 Track solved problems per user
+- 🔐 Local browser accounts for login/signup
+- 📊 Track solved problems per local user
 - 🎯 Filter by rating range
 - 📈 Progress tracking with ELO calculation
 - 🌓 Dark/Light theme toggle
@@ -14,7 +14,6 @@ A Next.js application for tracking LeetCode problem progress with user authentic
 ## Prerequisites
 
 - Node.js 18+ installed
-- A Supabase account and project
 
 ## Setup
 
@@ -23,23 +22,7 @@ A Next.js application for tracking LeetCode problem progress with user authentic
    npm install
    ```
 
-2. **Set up Supabase:**
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Go to SQL Editor and run the schema from `supabase/schema.sql`
-   - Copy your project URL and anon key from Settings > API
-
-3. **Configure environment variables:**
-   ```bash
-   cp .env.example .env.local
-   ```
-   
-   Edit `.env.local` and add your Supabase credentials:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-4. **Add your LeetCode problems data:**
+2. **Add your LeetCode problems data:**
    - Place your `data.json` file in the `public/` directory
    - The file should be an array of problems with this structure:
      ```json
@@ -53,7 +36,7 @@ A Next.js application for tracking LeetCode problem progress with user authentic
      ]
      ```
 
-5. **Run the development server:**
+3. **Run the development server:**
    ```bash
    npm run dev
    ```
@@ -66,20 +49,19 @@ A Next.js application for tracking LeetCode problem progress with user authentic
 
 1. Push your code to GitHub
 2. Import your repository in [Vercel](https://vercel.com)
-3. Add your environment variables in Vercel project settings
-4. Deploy!
+3. Deploy!
 
 The app will be automatically deployed on every push to your main branch.
 
-## Database Schema
+## Local Database
 
-The app uses a `user_progress` table in Supabase to store solved problems:
+The app stores all account and progress data in browser `localStorage`:
 
-- `id`: UUID primary key
-- `user_id`: References auth.users
-- `problem_id`: Integer (LeetCode problem ID)
-- `solved_at`: Timestamp
-- Row Level Security enabled (users can only see/modify their own progress)
+- `lc-tracking-accounts`: local account list
+- `lc-tracking-session`: current browser session
+- `lc-tracking-progress:<userId>`: solved problem timestamps per local user
+
+No remote database or environment variables are required.
 
 ## Project Structure
 
@@ -93,12 +75,10 @@ The app uses a `user_progress` table in Supabase to store solved problems:
 │   └── page.tsx          # Main tracker page
 ├── components/           # React components
 ├── lib/
-│   ├── supabase.ts      # Supabase client
+│   ├── localDb.ts       # Browser local database
 │   └── utils.ts         # Utility functions
 ├── public/
 │   └── data.json        # LeetCode problems data
-├── supabase/
-│   └── schema.sql       # Database schema
 └── types/
     └── index.ts         # TypeScript types
 ```
