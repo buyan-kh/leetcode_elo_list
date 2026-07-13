@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { localDb, LocalUser } from '@/lib/localDb'
+import { localDb } from '@/lib/localDb'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Checkbox } from '@/components/Checkbox'
@@ -13,7 +12,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { Pagination } from '@/components/Pagination'
 import { cn } from '@/lib/utils'
 import { Problem } from '@/types'
-import Link from 'next/link'
+
 
 const THEME_KEY = 'lc-tracking-theme'
 
@@ -39,40 +38,23 @@ export default function HomePage() {
   const [theme, setTheme] = useState<'dark' | 'light'>(loadTheme)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
-  const [user, setUser] = useState<LocalUser | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
   const filtersInitializedRef = useRef(false)
-  const router = useRouter()
 
   useEffect(() => {
-    const initAuth = () => {
-      const currentUser = localDb.getCurrentUser()
-      setUser(currentUser)
-      setAuthLoading(false)
-
-      if (currentUser) {
-        const progress = localDb.getProgress(currentUser.id)
-        const progressMap = new Map<number, string>()
-        Object.entries(progress).forEach(([problemId, solvedAt]) => {
-          progressMap.set(Number(problemId), solvedAt)
-        })
-        setSolvedIds(progressMap)
-      }
+    const initProgress = () => {
+      const progress = localDb.getProgress()
+      const progressMap = new Map<number, string>()
+      Object.entries(progress).forEach(([problemId, solvedAt]) => {
+        progressMap.set(Number(problemId), solvedAt)
+      })
+      setSolvedIds(progressMap)
     }
-    initAuth()
+    initProgress()
   }, [])
 
   useEffect(() => {
     const handleStorageChange = () => {
-      const currentUser = localDb.getCurrentUser()
-      setUser(currentUser)
-
-      if (!currentUser) {
-        setSolvedIds(new Map())
-        return
-      }
-
-      const progress = localDb.getProgress(currentUser.id)
+      const progress = localDb.getProgress()
       const progressMap = new Map<number, string>()
       Object.entries(progress).forEach(([problemId, solvedAt]) => {
         progressMap.set(Number(problemId), solvedAt)
@@ -120,30 +102,19 @@ export default function HomePage() {
   }, [])
 
   const toggleSolved = async (id: number) => {
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
     const isSolved = solvedIds.has(id)
     const next = new Map(solvedIds)
 
     if (isSolved) {
       next.delete(id)
-      localDb.deleteSolved(user.id, id)
+      localDb.deleteSolved(id)
     } else {
       const timestamp = new Date().toISOString()
       next.set(id, timestamp)
-      localDb.saveSolved(user.id, id, timestamp)
+      localDb.saveSolved(id, timestamp)
     }
 
     setSolvedIds(next)
-  }
-
-  const handleLogout = async () => {
-    localDb.signOut()
-    setUser(null)
-    setSolvedIds(new Map())
-    router.push('/auth/login')
   }
 
   const toggleTheme = () => {
@@ -236,14 +207,6 @@ export default function HomePage() {
     if (bounds.max !== null) setMaxRating(String(bounds.max))
   }
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    )
-  }
-
   return (
     <div
       className={cn(
@@ -280,32 +243,6 @@ export default function HomePage() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              {user ? (
-                <div className="flex items-center gap-4">
-                  <span
-                    className={cn(
-                      'text-sm',
-                      theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                    )}
-                  >
-                    {user.email}
-                  </span>
-                  <Button variant="outline" theme={theme} onClick={handleLogout}>
-                    Logout
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Link href="/auth/login">
-                    <Button variant="outline" theme={theme}>
-                      Login
-                    </Button>
-                  </Link>
-                  <Link href="/auth/signup">
-                    <Button theme={theme}>Sign Up</Button>
-                  </Link>
-                </div>
-              )}
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
@@ -366,30 +303,6 @@ export default function HomePage() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
-        {!user && (
-          <Card
-            className={cn(
-              'p-4',
-              theme === 'dark'
-                ? 'border-amber-400/40 bg-amber-400/10 text-amber-50'
-                : 'border-amber-500/40 bg-amber-50 text-amber-900'
-            )}
-            theme={theme}
-          >
-            <div className="text-sm">
-              Please{' '}
-              <Link href="/auth/login" className="underline">
-                login
-              </Link>{' '}
-              or{' '}
-              <Link href="/auth/signup" className="underline">
-                sign up
-              </Link>{' '}
-              to track your progress in this browser.
-            </div>
-          </Card>
-        )}
-
         <Card className="p-4" theme={theme}>
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-col gap-2">

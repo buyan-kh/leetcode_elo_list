@@ -4,8 +4,7 @@ A Next.js application for tracking LeetCode problem progress with browser local 
 
 ## Features
 
-- 🔐 Local browser accounts for login/signup
-- 📊 Track solved problems per local user
+- 📊 Track solved problems locally in your browser
 - 🎯 Filter by rating range
 - 📈 Progress tracking with ELO calculation
 - 🌓 Dark/Light theme toggle
@@ -67,9 +66,6 @@ No remote database or environment variables are required.
 
 ```
 ├── app/
-│   ├── auth/
-│   │   ├── login/        # Login page
-│   │   └── signup/       # Signup page
 │   ├── globals.css       # Global styles
 │   ├── layout.tsx        # Root layout
 │   └── page.tsx          # Main tracker page
