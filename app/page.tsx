@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { localDb, LocalUser } from '@/lib/localDb'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Checkbox } from '@/components/Checkbox'
@@ -12,7 +12,7 @@ import { Progress } from '@/components/Progress'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Pagination } from '@/components/Pagination'
 import { cn } from '@/lib/utils'
-import { Problem, UserProgress } from '@/types'
+import { Problem } from '@/types'
 import Link from 'next/link'
 
 const THEME_KEY = 'lc-tracking-theme'
@@ -39,60 +39,49 @@ export default function HomePage() {
   const [theme, setTheme] = useState<'dark' | 'light'>(loadTheme)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<LocalUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const filtersInitializedRef = useRef(false)
   const router = useRouter()
 
   useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
+    const initAuth = () => {
+      const currentUser = localDb.getCurrentUser()
+      setUser(currentUser)
       setAuthLoading(false)
 
-      if (session?.user) {
-        // Load user progress from Supabase
-        const { data, error } = await supabase
-          .from('user_progress')
-          .select('problem_id, solved_at')
-          .eq('user_id', session.user.id)
-
-        if (!error && data) {
-          const progressMap = new Map<number, string>()
-          data.forEach((item: UserProgress) => {
-            progressMap.set(item.problem_id, item.solved_at)
-          })
-          setSolvedIds(progressMap)
-        }
+      if (currentUser) {
+        const progress = localDb.getProgress(currentUser.id)
+        const progressMap = new Map<number, string>()
+        Object.entries(progress).forEach(([problemId, solvedAt]) => {
+          progressMap.set(Number(problemId), solvedAt)
+        })
+        setSolvedIds(progressMap)
       }
     }
     initAuth()
   }, [])
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        // Reload progress when user logs in
-        supabase
-          .from('user_progress')
-          .select('problem_id, solved_at')
-          .eq('user_id', session.user.id)
-          .then(({ data, error }) => {
-            if (!error && data) {
-              const progressMap = new Map<number, string>()
-              data.forEach((item: UserProgress) => {
-                progressMap.set(item.problem_id, item.solved_at)
-              })
-              setSolvedIds(progressMap)
-            }
-          })
-      } else {
-        setSolvedIds(new Map())
-      }
-    })
+    const handleStorageChange = () => {
+      const currentUser = localDb.getCurrentUser()
+      setUser(currentUser)
 
-    return () => subscription.unsubscribe()
+      if (!currentUser) {
+        setSolvedIds(new Map())
+        return
+      }
+
+      const progress = localDb.getProgress(currentUser.id)
+      const progressMap = new Map<number, string>()
+      Object.entries(progress).forEach(([problemId, solvedAt]) => {
+        progressMap.set(Number(problemId), solvedAt)
+      })
+      setSolvedIds(progressMap)
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
   useEffect(() => {
@@ -140,30 +129,20 @@ export default function HomePage() {
 
     if (isSolved) {
       next.delete(id)
-      // Delete from Supabase
-      await supabase
-        .from('user_progress')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('problem_id', id)
+      localDb.deleteSolved(user.id, id)
     } else {
       const timestamp = new Date().toISOString()
       next.set(id, timestamp)
-      // Insert into Supabase
-      await supabase
-        .from('user_progress')
-        .insert({
-          user_id: user.id,
-          problem_id: id,
-          solved_at: timestamp,
-        })
+      localDb.saveSolved(user.id, id, timestamp)
     }
 
     setSolvedIds(next)
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    localDb.signOut()
+    setUser(null)
+    setSolvedIds(new Map())
     router.push('/auth/login')
   }
 
@@ -230,7 +209,7 @@ export default function HomePage() {
       (count, p) => (solvedIds.has(p.ID) ? count + 1 : 0),
       0
     )
-  }, [problems, solvedIds])
+  }, [problems, solvedIds, total])
 
   const progress = total ? Math.round((solvedCount / total) * 100) : 0
 
@@ -406,7 +385,7 @@ export default function HomePage() {
               <Link href="/auth/signup" className="underline">
                 sign up
               </Link>{' '}
-              to track your progress across devices.
+              to track your progress in this browser.
             </div>
           </Card>
         )}
